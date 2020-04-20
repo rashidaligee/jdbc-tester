@@ -61,9 +61,9 @@ public class App
         Connection connection = null;
         ResultSet resultset = null;
 
-        try {
+	for (int i = 1; i <= counter; i++) {
 
-        for (int i = 1; i <= counter; i++) {
+           try {
         	LOGGER.info("Counter ="+i);
             connection = ds.getConnection();
             DatabaseMetaData dbMetadata = connection.getMetaData();
@@ -71,14 +71,14 @@ public class App
             resultset = dbMetadata.getTables(catalog, schema, null, null);
             long endTime = System.currentTimeMillis();
             LOGGER.info("Time Taken to call getTables" + (endTime - startTime));
-		}
+		
         }catch(Exception ex ) {
         	LOGGER.info("ERROR executing connection call");
         	throw ex;
         }finally {
         	close(connection, null, resultset);
         }
-    	
+	}
     }
 	public static void usage(){
     	LOGGER.severe("java -cp <classpath> com.srh.jdbctester.jdbc_tester.App <propertiesLocation>");
