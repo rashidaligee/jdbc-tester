@@ -49,10 +49,11 @@ public class App
     }
     
     public void performAction(Properties props) throws Exception{
-        LOGGER.info("going to create ds");
+        int counter = Integer.parseInt((String)props.getOrDefault(KEY_CALL_COUNTER, 10));
+
+	LOGGER.info("going to create ds");
         DataSource ds = this.createDataSource(props);
         
-        int counter = (Integer)props.getOrDefault(KEY_CALL_COUNTER, 10);
         
         String schema = props.getProperty(KEY_SCHEMA);
         String catalog = props.getProperty(KEY_CATALOG);
