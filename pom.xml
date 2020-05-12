@@ -4,7 +4,7 @@
 
   <groupId>com.srh.jdbctester</groupId>
   <artifactId>jdbc-tester</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.4-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>jdbc-tester</name>
   <url>http://maven.apache.org</url>
@@ -19,6 +19,13 @@
     	<artifactId>commons-dbcp</artifactId>
     	<version>1.4</version>
 	</dependency>
+	<!-- https://mvnrepository.com/artifact/org.apache.calcite/calcite-core -->
+<dependency>
+    <groupId>org.apache.calcite</groupId>
+    <artifactId>calcite-core</artifactId>
+    <version>1.17.0</version>
+</dependency>
+	
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
