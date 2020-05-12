@@ -7,10 +7,18 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
+import org.apache.calcite.adapter.jdbc.JdbcConvention;
+import org.apache.calcite.adapter.jdbc.JdbcSchema;
+import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlDialectFactoryImpl;
 import org.apache.commons.dbcp.BasicDataSource;
 
 
@@ -29,10 +37,16 @@ public class App
 	private static String KEY_CALL_COUNTER = "call_counter";
 	private static String KEY_SCHEMA = "call_schema";
 	private static String KEY_CATALOG = "call_catalog";
+	private static String KEY_DS_TEST = "ds_test";
+	private static String KEY_DB_TYPE = "db_type";
+	private static String KEY_PRINT_TABLE = "print_table";
+	private static String KEY_THREAD_COUNT = "thread_count";
 	
 
     public static void main( String[] args ) throws Exception
     {
+    	
+    
         if (args.length == 0){
         	usage();
         	return;
@@ -49,37 +63,106 @@ public class App
     }
     
     public void performAction(Properties props) throws Exception{
+        
         int counter = Integer.parseInt((String)props.getOrDefault(KEY_CALL_COUNTER, 10));
 
-	LOGGER.info("going to create ds");
+        LOGGER.info("going to create ds");
         DataSource ds = this.createDataSource(props);
-        
-        
+
         String schema = props.getProperty(KEY_SCHEMA);
         String catalog = props.getProperty(KEY_CATALOG);
 
+        
+        String ds_test = props.getProperty(KEY_DS_TEST);
+        
         Connection connection = null;
         ResultSet resultset = null;
 
-	for (int i = 1; i <= counter; i++) {
-
-           try {
-        	LOGGER.info("Counter ="+i);
-            connection = ds.getConnection();
-            DatabaseMetaData dbMetadata = connection.getMetaData();
-            long startTime = System.currentTimeMillis();
-            resultset = dbMetadata.getTables(catalog, schema, null, null);
-            long endTime = System.currentTimeMillis();
-            LOGGER.info("Time Taken to call getTables" + (endTime - startTime));
-		
+        for (int i = 1; i <= counter; i++) {
+        try {
+        	if(ds_test != null && ds_test.equalsIgnoreCase("true")) {
+	        	LOGGER.info("Counter = "+i);
+	            connection = ds.getConnection();
+	            DatabaseMetaData dbMetadata = connection.getMetaData();
+	            long startTime = System.currentTimeMillis();
+	            resultset = dbMetadata.getTables(catalog, schema, null, null);
+	            long endTime = System.currentTimeMillis();
+	            LOGGER.info("Time Taken to call getTables " + (endTime - startTime));
+            }else {
+            	
+            	
+            	emulateHiveCalcite(props);
+            }
         }catch(Exception ex ) {
         	LOGGER.info("ERROR executing connection call");
         	throw ex;
         }finally {
         	close(connection, null, resultset);
         }
-	}
+       }
+    	
     }
+
+	private void emulateHiveCalcite(Properties props) throws Exception {
+        int counter = Integer.parseInt((String)props.getOrDefault(KEY_THREAD_COUNT, 10));
+
+        ExecutorService executors = Executors.newFixedThreadPool(counter);
+        
+        for (int i = 1; i <= counter; i++) {
+			executors.execute(new CalciteRunnable(props));
+		}
+		
+        executors.shutdown();
+        
+        executors.awaitTermination(30, TimeUnit.SECONDS);
+		
+	}
+	
+	public static class CalciteRunnable implements Runnable{
+
+		final String url;
+		final String user;
+		final String pswd;
+		final String driver;
+		final String dataBaseType;
+        final String schemaName;
+        final String catalogName;
+        final String printTables;
+
+		public CalciteRunnable(Properties props) {
+			this.url = props.getProperty(KEY_JDBC_URL);
+			this.user = props.getProperty(KEY_JDBC_USER);
+			this.pswd = props.getProperty(KEY_JDBC_PASSWORD);
+			this.driver = props.getProperty(KEY_JDBC_DRIVER_CLASS_NAME);
+			this.dataBaseType = props.getProperty(KEY_DB_TYPE, "POSTGRES");
+	        this.schemaName = props.getProperty(KEY_SCHEMA);
+	        this.catalogName = props.getProperty(KEY_CATALOG);
+	        this.printTables = props.getProperty(KEY_PRINT_TABLE);
+			
+		}
+
+		public void run() {
+					String threadname = Thread.currentThread().getName();
+					
+					LOGGER.info(System.currentTimeMillis()+"-"+threadname + " calling calcite");
+					DataSource ds = JdbcSchema.dataSource(url, driver, user, pswd);
+					SqlDialect jdbcDialect = JdbcSchema.createDialect(SqlDialectFactoryImpl.INSTANCE, ds);
+					LOGGER.info(System.currentTimeMillis()+"-"+threadname + " jdbcDialect is created");
+					JdbcConvention jc = JdbcConvention.of(jdbcDialect, null, dataBaseType);
+					JdbcSchema schema = new JdbcSchema(ds, jc.dialect, jc, catalogName, schemaName);
+					Set<String> tableNames = schema.getTableNames();
+					LOGGER.info(System.currentTimeMillis()+"-"+threadname + " getTagbles is called");
+					if(printTables != null && printTables.trim().equalsIgnoreCase("true")) {
+						for (String tableName : tableNames) {
+							System.out.print(tableName+",");
+						}
+						System.out.println();
+					}
+					LOGGER.info(threadname + " finished");
+					
+				}
+		
+	}
 	public static void usage(){
     	LOGGER.severe("java -cp <classpath> com.srh.jdbctester.jdbc_tester.App <propertiesLocation>");
     }
